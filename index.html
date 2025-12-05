@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Book Management App</title>
+  <style>
+    :root{
+      --accent:#3b82f6;
+      --card-bg:#fff;
+      --muted:#6b7280;
+      --shadow: 0 4px 10px rgba(0,0,0,0.08);
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    }
+    body{
+      margin:0;
+      background:#f3f4f6;
+      color:#111827;
+      min-height:100vh;
+      display:flex;
+      gap:20px;
+      padding:20px;
+      box-sizing:border-box;
+    }
+
+    /* Sidebar */
+    .sidebar{
+      width:320px;
+      background:linear-gradient(180deg,#ffffff, #f9fafb);
+      border-radius:12px;
+      padding:18px;
+      box-shadow:var(--shadow);
+      flex-shrink:0;
+      height:fit-content;
+    }
+    .logo{ font-weight:700; color:var(--accent); font-size:18px; margin-bottom:12px; }
+    label{ display:block; margin-top:10px; font-size:13px; color:var(--muted);}
+    input[type="text"], input[type="number"], textarea{
+      width:100%;
+      padding:8px 10px;
+      margin-top:6px;
+      border-radius:8px;
+      border:1px solid #e5e7eb;
+      box-sizing:border-box;
+      font-size:14px;
+      background:white;
+    }
+    button.primary{
+      margin-top:14px;
+      width:100%;
+      padding:10px;
+      background:var(--accent);
+      color:white;
+      border:none;
+      border-radius:8px;
+      cursor:pointer;
+      font-weight:600;
+      box-shadow: 0 6px 14px rgba(59,130,246,0.18);
+    }
+    .muted-btn{
+      margin-top:8px;
+      width:100%;
+      padding:8px;
+      border-radius:8px;
+      border:1px solid #e5e7eb;
+      background:white;
+      cursor:pointer;
+    }
+
+    /* Main content */
+    .main{
+      flex:1;
+      display:flex;
+      flex-direction:column;
+      gap:16px;
+    }
+    .header{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:12px;
+    }
+    .search{
+      width:320px;
+      display:flex;
+      gap:8px;
+    }
+    .search input{
+      flex:1;
+      padding:8px 10px;
+      border-radius:8px;
+      border:1px solid #e5e7eb;
+      background:white;
+    }
+
+    /* Grid of cards: 3 per row on desktop */
+    .grid{
+      display:grid;
+      gap:18px;
+      grid-template-columns: repeat(3, 1fr);
+    }
+    @media (max-width:1000px){
+      .grid{ grid-template-columns: repeat(2,1fr); }
+      .sidebar{ width:300px; }
+      .search{ width:240px; }
+    }
+    @media (max-width:640px){
+      body{ flex-direction:column; padding:12px; }
+      .grid{ grid-template-columns: 1fr; }
+      .sidebar{ width:100%; }
+      .search{ width:100%; }
+    }
+
+    .card{
+      background:var(--card-bg);
+      border-radius:12px;
+      padding:12px;
+      box-shadow:var(--shadow);
+      display:flex;
+      gap:12px;
+      align-items:flex-start;
+    }
+    .cover{
+      width:100px;
+      height:140px;
+      border-radius:8px;
+      background:#f3f3f3;
+      object-fit:cover;
+      flex-shrink:0;
+      border:1px solid #e5e7eb;
+    }
+    .meta{ flex:1; display:flex; flex-direction:column; gap:8px;}
+    .title{ font-weight:700; font-size:16px; }
+    .author{ color:var(--muted); font-size:14px; }
+    .price{ font-weight:600; color:#111827; }
+    .actions{ display:flex; gap:8px; margin-top:auto; }
+    .actions button{ padding:6px 8px; border-radius:8px; border:none; cursor:pointer; font-weight:600; }
+    .view-btn{ background:#efefef; color:#111827; }
+    .update-btn{ background:#10b981; color:white; }
+    .delete-btn{ background:#ef4444; color:white; }
+
+    /* Modal */
+    .modal-backdrop{
+      position:fixed;
+      inset:0;
+      background:rgba(0,0,0,0.4);
+      display:none;
+      align-items:center;
+      justify-content:center;
+      z-index:50;
+    }
+    .modal{
+      width:90%;
+      max-width:600px;
+      background:white;
+      border-radius:12px;
+      padding:18px;
+      box-shadow:var(--shadow);
+    }
+    .modal h3{ margin:0 0 6px 0; }
+    .modal .close{
+      background:#efefef;
+      border:none;
+      padding:6px 10px;
+      border-radius:8px;
+      cursor:pointer;
+    }
+
+    .empty{ color:var(--muted); padding:20px; text-align:center; background:white; border-radius:12px; box-shadow:var(--shadow); }
+  </style>
+</head>
+<body>
+
+  <aside class="sidebar">
+    <div class="logo">Book Manager</div>
+
+    <form id="addForm">
+      <label for="title">Title</label>
+      <input id="title" type="text" placeholder="Book title" required>
+
+      <label for="author">Author</label>
+      <input id="author" type="text" placeholder="Author name" required>
+
+      <label for="price">Price (USD)</label>
+      <input id="price" type="number" min="0" step="0.01" placeholder="9.99" required>
+
+      <label for="image">Cover Image URL</label>
+      <input id="image" type="text" placeholder="https://example.com/cover.jpg" required>
+
+      <button class="primary" type="submit">Add Book</button>
+      <button class="muted-btn" id="clearAll" type="button">Clear All Books (Firestore)</button>
+    </form>
+
+    <div style="margin-top:14px; font-size:13px; color:var(--muted)">
+      Notes:
+      <ul>
+        <li>Uses Firestore real-time sync.</li>
+        <li>Seeding runs once if collection is empty.</li>
+      </ul>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="header">
+      <h2>Books</h2>
+
+      <div class="search">
+        <input id="search" type="text" placeholder="Search by title or author...">
+      </div>
+    </div>
+
+    <div id="grid" class="grid"></div>
+
+    <div id="emptyState" class="empty" style="display:none;">No books found.</div>
+  </main>
+
+  <!-- Modal for view details -->
+  <div id="backdrop" class="modal-backdrop">
+    <div class="modal" role="dialog" aria-modal="true">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <h3 id="modalTitle">Book Title</h3>
+        <button class="close" id="closeModal">Close</button>
+      </div>
+      <img id="modalCover" src="" alt="cover" style="width:100%; max-height:360px; object-fit:contain; border-radius:8px; margin-top:12px;">
+      <p id="modalAuthor" style="margin-top:12px; color:var(--muted)"></p>
+      <p id="modalPrice" style="font-weight:700; margin-top:6px;"></p>
+    </div>
+  </div>
+
+  <!-- Firebase SDKs (v9 modular) -->
+  <script type="module">
+    // -- FIREBASE CONFIG: Replace with your project's config from Firebase console --
+    const firebaseConfig = {
+      apiKey: "YOUR_API_KEY",
+      authDomain: "YOUR_AUTH_DOMAIN",
+      projectId: "YOUR_PROJECT_ID",
+      storageBucket: "YOUR_STORAGE_BUCKET",
+      messagingSenderId: "YOUR_SENDER_ID",
+      appId: "YOUR_APP_ID"
+    };
+
+    // Import the parts of Firebase we need (v9 modular)
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
+    import {
+      getFirestore, collection, addDoc, doc,
+      onSnapshot, deleteDoc, updateDoc, getDocs, query, orderBy
+    } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
+
+    // Initialize Firebase and Firestore
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const booksCol = collection(db, "books");
+
+    // UI elements
+    const grid = document.getElementById("grid");
+    const addForm = document.getElementById("addForm");
+    const titleIn = document.getElementById("title");
+    const authorIn = document.getElementById("author");
+    const priceIn = document.getElementById("price");
+    const imageIn = document.getElementById("image");
+    const searchIn = document.getElementById("search");
+    const emptyState = document.getElementById("emptyState");
+    const clearAllBtn = document.getElementById("clearAll");
+
+    const backdrop = document.getElementById("backdrop");
+    const closeModal = document.getElementById("closeModal");
+    const modalTitle = document.getElementById("modalTitle");
+    const modalCover = document.getElementById("modalCover");
+    const modalAuthor = document.getElementById("modalAuthor");
+    const modalPrice = document.getElementById("modalPrice");
+
+    // Helper: render array of book docs to UI
+    function renderBooks(docs){
+      grid.innerHTML = "";
+      if (!docs.length){
+        emptyState.style.display = "block";
+        return;
+      } else {
+        emptyState.style.display = "none";
+      }
+
+      docs.forEach(docSnap => {
+        const book = { id: docSnap.id, ...docSnap.data() };
+
+        const card = document.createElement("div");
+        card.className = "card";
+
+        const img = document.createElement("img");
+        img.className = "cover";
+        img.src = book.coverImageURL || "";
+        img.alt = book.title;
+
+        const meta = document.createElement("div");
+        meta.className = "meta";
+
+        const t = document.createElement("div");
+        t.className = "title";
+        t.textContent = book.title;
+
+        const a = document.createElement("div");
+        a.className = "author";
+        a.textContent = "By: " + (book.author || "Unknown");
+
+        const p = document.createElement("div");
+        p.className = "price";
+        p.textContent = "$" + (parseFloat(book.price) || 0).toFixed(2);
+
+        const actions = document.createElement("div");
+        actions.className = "actions";
+
+        const viewBtn = document.createElement("button");
+        viewBtn.className = "view-btn";
+        viewBtn.textContent = "View Details";
+        viewBtn.onclick = () => openModal(book);
+
+        const updateBtn = document.createElement("button");
+        updateBtn.className = "update-btn";
+        updateBtn.textContent = "Update Author";
+        updateBtn.onclick = () => updateAuthor(book);
+
+        const deleteBtn = document.createElement("button");
+        deleteBtn.className = "delete-btn";
+        deleteBtn.textContent = "Delete";
+        deleteBtn.onclick = () => removeBook(book.id);
+
+        actions.appendChild(viewBtn);
+        actions.appendChild(updateBtn);
+        actions.appendChild(deleteBtn);
+
+        meta.appendChild(t);
+        meta.appendChild(a);
+        meta.appendChild(p);
+        meta.appendChild(actions);
+
+        card.appendChild(img);
+        card.appendChild(meta);
+
+        grid.appendChild(card);
+      });
+    }
+
+    // Open modal to show book details
+    function openModal(book){
+      modalTitle.textContent = book.title;
+      modalCover.src = book.coverImageURL || "";
+      modalAuthor.textContent = "Author: " + (book.author || "Unknown");
+      modalPrice.textContent = "Price: $" + (parseFloat(book.price) || 0).toFixed(2);
+      backdrop.style.display = "flex";
+    }
+    closeModal.onclick = () => backdrop.style.display = "none";
+    backdrop.onclick = (e) => { if (e.target === backdrop) backdrop.style.display = "none"; };
+
+    // Add new book to Firestore
+    addForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const title = titleIn.value.trim();
+      const author = authorIn.value.trim();
+      const price = priceIn.value;
+      const coverImageURL = imageIn.value.trim();
+
+      if (!title || !author || !price || !coverImageURL){
+        alert("All fields are required.");
+        return;
+      }
+
+      try {
+        await addDoc(booksCol, { title, author, price, coverImageURL });
+        addForm.reset();
+      } catch (err) {
+        console.error("Add book error:", err);
+        alert("Failed to add book. Check console.");
+      }
+    });
+
+    // Remove book by doc id
+    async function removeBook(id){
+      if (!confirm("Delete this book?")) return;
+      try {
+        await deleteDoc(doc(db, "books", id));
+      } catch (err) {
+        console.error("Delete error:", err);
+        alert("Failed to delete book.");
+      }
+    }
+
+    // Update author
+    async function updateAuthor(book){
+      const newAuthor = prompt("Enter new author name:", book.author || "");
+      if (newAuthor === null) return;
+      const trimmed = newAuthor.trim();
+      if (!trimmed){
+        alert("Author name cannot be empty.");
+        return;
+      }
+      try {
+        await updateDoc(doc(db, "books", book.id), { author: trimmed });
+      } catch (err) {
+        console.error("Update error:", err);
+        alert("Failed to update author.");
+      }
+    }
+
+    // Clear all books (dangerous operation)
+    clearAllBtn.addEventListener("click", async () => {
+      if (!confirm("This will delete ALL books in the books collection in Firestore. Continue?")) return;
+      try {
+        const snapshot = await getDocs(booksCol);
+        const deletes = snapshot.docs.map(d => deleteDoc(doc(db, "books", d.id)));
+        await Promise.all(deletes);
+        alert("All books deleted.");
+      } catch (err) {
+        console.error("Clear all error:", err);
+        alert("Failed to clear books.");
+      }
+    });
+
+    // Real-time listener and search integration
+    // We will listen to the whole collection ordered by title
+    const q = query(booksCol, orderBy("title"));
+    let latestDocs = []; // cache the latest snapshot docs
+
+    onSnapshot(q, (snapshot) => {
+      latestDocs = snapshot.docs;
+      applySearchAndRender();
+    }, (err) => {
+      console.error("Realtime listener error:", err);
+    });
+
+    // Search input to filter the cached docs
+    searchIn.addEventListener("input", applySearchAndRender);
+
+    function applySearchAndRender(){
+      const queryText = searchIn.value.trim().toLowerCase();
+      if (!latestDocs.length){
+        renderBooks([]);
+        return;
+      }
+      if (!queryText){
+        renderBooks(latestDocs);
+        return;
+      }
+      const filtered = latestDocs.filter(d => {
+        const data = d.data();
+        return (data.title || "").toLowerCase().includes(queryText) ||
+               (data.author || "").toLowerCase().includes(queryText);
+      });
+      renderBooks(filtered);
+    }
+
+    // Seed dummy data if collection is empty (runs once on first load)
+    (async function seedIfEmpty(){
+      try {
+        const snapshot = await getDocs(booksCol);
+        if (snapshot.empty){
+          const seed = [
+            { title: "The Pragmatic Programmer", author: "Andy Hunt", price: "29.99", coverImageURL: "https://images-na.ssl-images-amazon.com/images/I/41as+WafrFL._SX396_BO1,204,203,200_.jpg" },
+            { title: "Eloquent JavaScript", author: "Marijn Haverbeke", price: "24.50", coverImageURL: "https://eloquentjavascript.net/img/cover.jpg" },
+            { title: "You Don’t Know JS", author: "Kyle Simpson", price: "19.99", coverImageURL: "https://images-na.ssl-images-amazon.com/images/I/51b5YG6Y1rL._SX331_BO1,204,203,200_.jpg" },
+            { title: "Clean Code", author: "Robert C. Martin", price: "32.00", coverImageURL: "https://images-na.ssl-images-amazon.com/images/I/41-sN-mzwKL._SX374_BO1,204,203,200_.jpg" },
+            { title: "Introduction to Algorithms", author: "Cormen et al.", price: "89.99", coverImageURL: "https://mitpress.mit.edu/sites/default/files/9780262046305.jpg" }
+          ];
+          const promises = seed.map(b => addDoc(booksCol, b));
+          await Promise.all(promises);
+          console.log("Seeded sample books.");
+        }
+      } catch (err) {
+        console.error("Seeding error:", err);
+      }
+    })();
+
+  </script>
+
+</body>
+</html>
